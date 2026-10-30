@@ -1,0 +1,386 @@
+
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Aether Weather — Погода в реальном времени</title>
+  
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#07111f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Aether Weather">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+
+  <meta name="description" content="Узнайте погоду в своём городе, прогноз на ближайшие часы и 5 дней с атмосферными погодными анимациями.">
+  <meta name="theme-color" content="#07111f">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+  <!-- DaisyUI -->
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,.25) transparent;
+    }
+
+    html {
+      min-height: 100%;
+      background: #07111f;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      overflow-x: hidden;
+      color: #f8fafc;
+      font-family: "Inter", sans-serif;
+      background: linear-gradient(135deg, #10284b, #235b86, #10223e);
+      background-attachment: fixed;
+      transition: background 1.2s ease;
+    }
+
+    .glass {
+      background: rgba(255,255,255,.075);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 12px 40px rgba(0,0,0,.12);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+
+    .glass-input {
+      background: rgba(255,255,255,.055);
+      border: 1px solid rgba(255,255,255,.13);
+      outline: none;
+      transition: border-color .2s, background .2s;
+    }
+
+    .glass-input:focus {
+      border-color: rgba(255,255,255,.45);
+      background: rgba(255,255,255,.1);
+    }
+
+    .weather-card {
+      transition: transform .25s ease, background .25s ease;
+    }
+
+    .weather-card:hover {
+      transform: translateY(-4px);
+      background: rgba(255,255,255,.12);
+    }
+
+    .weather-icon {
+      filter: drop-shadow(0 8px 24px rgba(255,255,255,.14));
+    }
+
+    .loader {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #weatherCanvas {
+      opacity: 1;
+      transition: opacity 1s ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="px-4 py-5 sm:px-6 sm:py-8">
+    
+<!-- PWA Install Popup -->
+<div
+  id="installModal"
+  class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 p-4 backdrop-blur-md"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="installTitle"
+>
+  <div class="relative w-full max-w-sm overflow-hidden rounded-3xl border border-white/15 bg-slate-950/80 p-6 text-white shadow-2xl backdrop-blur-2xl">
+
+    <button
+      id="closeInstallModal"
+      type="button"
+      class="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-white/10 hover:text-white"
+      aria-label="Закрыть окно"
+    >
+      <i data-lucide="x" class="h-5 w-5"></i>
+    </button>
+
+    <div class="mb-5 flex justify-center">
+      <div class="flex h-20 w-20 items-center justify-center overflow-hidden rounded-3xl border border-cyan-300/30 bg-cyan-400/10 shadow-lg shadow-cyan-500/20">
+        <img
+          src="./icons/icon-192.png"
+          alt="Aether Weather"
+          class="h-full w-full object-cover"
+        >
+      </div>
+    </div>
+
+    <div class="text-center">
+      <p class="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-cyan-300">
+        Your weather. Everywhere.
+      </p>
+
+      <h2 id="installTitle" class="text-2xl font-semibold tracking-tight">
+        Установить Aether Weather?
+      </h2>
+
+      <p class="mt-3 text-sm leading-6 text-slate-300">
+        Быстрый доступ к погоде, красивые анимации и отдельное окно приложения.
+      </p>
+    </div>
+
+    <div class="mt-6 flex flex-col gap-3">
+      <button
+        id="installAppBtn"
+        type="button"
+        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3.5 font-semibold text-slate-950 transition hover:bg-cyan-200 active:scale-[0.98]"
+      >
+        <i data-lucide="download" class="h-5 w-5"></i>
+        <span id="installButtonText">Установить приложение</span>
+      </button>
+
+      <p
+        id="installHelp"
+        class="hidden rounded-xl border border-white/10 bg-white/5 p-3 text-sm leading-5 text-slate-300"
+        aria-live="polite"
+      ></p>
+
+      <button
+        id="laterInstallBtn"
+        type="button"
+        class="w-full rounded-2xl px-5 py-3 text-sm text-slate-400 transition hover:bg-white/5 hover:text-white"
+      >
+        Может быть позже
+      </button>
+    </div>
+  </div>
+</div>
+
+    
+
+  <!-- Погодная анимация на весь экран -->
+  <canvas
+    id="weatherCanvas"
+    class="pointer-events-none fixed inset-0 z-0 h-full w-full"
+    aria-hidden="true"
+  ></canvas>
+
+  <main class="relative z-10 mx-auto max-w-6xl">
+
+    <!-- HEADER -->
+    <header class="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <a href="#" class="flex items-center gap-3" aria-label="Aether Weather — главная">
+        <div class="glass flex h-12 w-12 items-center justify-center rounded-2xl">
+          <i data-lucide="cloud-sun" class="h-7 w-7"></i>
+        </div>
+
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">Aether</h1>
+          <p class="text-xs tracking-[0.2em] text-white/50">WEATHER</p>
+        </div>
+      </a>
+
+      <div class="flex items-center gap-2">
+        <button
+          id="locationBtn"
+          type="button"
+          class="glass btn btn-circle border-0 text-white hover:bg-white/15"
+          title="Определить моё местоположение"
+          aria-label="Определить моё местоположение"
+        >
+          <i data-lucide="navigation" class="h-5 w-5"></i>
+        </button>
+
+        <button
+          id="unitBtn"
+          type="button"
+          class="glass btn rounded-full border-0 px-4 text-white hover:bg-white/15"
+          aria-label="Переключить единицы температуры"
+        >
+          <span id="unitLabel">°C</span>
+          <i data-lucide="arrow-left-right" class="ml-2 h-4 w-4"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- SEARCH -->
+    <form id="searchForm" class="mb-5 flex flex-col gap-3 sm:flex-row">
+      <label class="glass flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-4">
+        <i data-lucide="search" class="h-5 w-5 shrink-0 text-white/60"></i>
+
+        <input
+          id="cityInput"
+          type="text"
+          class="glass-input w-full border-0 bg-transparent py-4 text-sm text-white placeholder:text-white/45"
+          placeholder="Введите название города..."
+          autocomplete="off"
+          aria-label="Название города"
+          required
+        >
+      </label>
+
+      <button
+        id="searchBtn"
+        type="submit"
+        class="btn min-h-14 rounded-2xl border-0 bg-white px-7 text-sm font-semibold text-slate-900 hover:bg-white/85"
+      >
+        <span id="searchBtnText">Найти город</span>
+        <span id="searchLoader" class="loader hidden"></span>
+      </button>
+    </form>
+
+    <p id="statusMessage" class="mb-5 hidden rounded-xl px-4 py-3 text-sm" role="status" aria-live="polite"></p>
+
+    <!-- CURRENT WEATHER -->
+    <section class="glass mb-6 overflow-hidden rounded-[2rem] p-6 sm:p-10">
+      <div class="grid items-center gap-8 md:grid-cols-2">
+
+        <div>
+          <div class="mb-4 flex items-center gap-2 text-sm text-white/65">
+            <i data-lucide="map-pin" class="h-4 w-4"></i>
+            <span id="cityName">Aether Weather</span>
+          </div>
+
+          <p id="currentDate" class="mb-5 text-sm text-white/50">Погода сейчас</p>
+
+          <p id="temperature" class="text-7xl font-semibold tracking-[-0.07em] sm:text-8xl">--°</p>
+
+          <h2 id="description" class="mt-4 text-xl font-medium capitalize">
+            Введите API key
+          </h2>
+
+          <p id="feelsLike" class="mt-2 text-sm text-white/55">
+            Ощущается как --°
+          </p>
+        </div>
+
+        <div class="flex flex-col items-center justify-center md:items-end">
+          <img
+            id="mainWeatherIcon"
+            src="https://openweathermap.org/img/wn/01d@4x.png"
+            alt="Иконка погоды"
+            class="weather-icon h-36 w-36 object-contain sm:h-48 sm:w-48"
+          >
+
+          <p id="sunInfo" class="text-sm text-white/60">
+            Восход и закат
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- WEATHER DETAILS -->
+    <section class="mb-8">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Детали погоды</h2>
+        <span class="text-xs text-white/45">Сейчас</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+
+        <article class="glass rounded-2xl p-4 sm:p-5">
+          <div class="mb-4 flex items-center gap-2 text-sm text-white/55">
+            <i data-lucide="droplets" class="h-4 w-4"></i>
+            Влажность
+          </div>
+          <p id="humidity" class="text-2xl font-semibold">--%</p>
+          <p class="mt-1 text-xs text-white/40">Влажность воздуха</p>
+        </article>
+
+        <article class="glass rounded-2xl p-4 sm:p-5">
+          <div class="mb-4 flex items-center gap-2 text-sm text-white/55">
+            <i data-lucide="wind" class="h-4 w-4"></i>
+            Ветер
+          </div>
+          <p id="wind" class="text-2xl font-semibold">-- м/с</p>
+          <p class="mt-1 text-xs text-white/40">Скорость ветра</p>
+        </article>
+
+        <article class="glass rounded-2xl p-4 sm:p-5">
+          <div class="mb-4 flex items-center gap-2 text-sm text-white/55">
+            <i data-lucide="gauge" class="h-4 w-4"></i>
+            Давление
+          </div>
+          <p id="pressure" class="text-2xl font-semibold">-- гПа</p>
+          <p class="mt-1 text-xs text-white/40">Атмосферное давление</p>
+        </article>
+
+        <article class="glass rounded-2xl p-4 sm:p-5">
+          <div class="mb-4 flex items-center gap-2 text-sm text-white/55">
+            <i data-lucide="eye" class="h-4 w-4"></i>
+            Видимость
+          </div>
+          <p id="visibility" class="text-2xl font-semibold">-- км</p>
+          <p class="mt-1 text-xs text-white/40">Дальность видимости</p>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- HOURLY FORECAST -->
+    <section class="mb-8">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <h2 class="text-lg font-semibold">Прогноз по часам</h2>
+        <span class="text-xs text-white/45">Ближайшие 24 часа</span>
+      </div>
+
+      <div id="hourlyForecast" class="flex gap-3 overflow-x-auto pb-4">
+        <p class="text-sm text-white/50">Здесь появится прогноз.</p>
+      </div>
+    </section>
+
+    <!-- DAILY FORECAST -->
+    <section class="mb-8">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <h2 class="text-lg font-semibold">Прогноз на 5 дней</h2>
+        <i data-lucide="calendar-days" class="h-5 w-5 text-white/50"></i>
+      </div>
+
+      <div id="dailyForecast" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <p class="text-sm text-white/50">Здесь появится прогноз на 5 дней.</p>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="pb-4 pt-2 text-center text-xs text-white/40">
+      <p>Данные о погоде предоставлены OpenWeatherMap</p>
+      <p class="mt-2">Aether Weather © <span id="year"></span></p>
+    </footer>
+
+  </main>
+
+  <script src="./script.js"></script>
+</body>
+</html>
